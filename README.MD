@@ -1,4 +1,6 @@
-Command arguments:
+# A buildpack for Heroku web applications.
+
+Command line arguments:
  - IPv4:port
  - SOURCE_DIRECTORY
  - PHP_PATH

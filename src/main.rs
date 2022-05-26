@@ -10,6 +10,19 @@ use dynamic_threading::DynamicThreading;
 
 mod php_executor;
 
+#[cfg(target_os="linux")]
+use signal_hook::{
+    iterator::Signals,
+    consts::signal::SIGTERM
+};
+
+#[cfg(target_os="linux")]
+use std::{
+    net::{
+        TcpStream
+    }
+};
+
 use std::{
     io::Read,
     net::{
@@ -26,13 +39,13 @@ use std::{
 const default_client_rw_timeout:Duration=Duration::from_micros(2500);
 
 const DEFAULT_SOURCE_DIRECTORY:&'static str=".";
-// ".";
 // Папка с файлами веб приложения
-static mut SOURCE_DIRECTORY:String=String::new();
-
-static mut PHP_PATH:String=String::new();
+pub static mut SOURCE_DIRECTORY:String=String::new();
 
 const DEFAULT_PHP_PATH:&'static str="php";
+pub static mut PHP_PATH:String=String::new();
+
+pub static mut running:bool=true;
 
 fn main(){
     println!("Starting...");
@@ -119,10 +132,21 @@ fn main(){
 
     let mut buffer=[0u8;4096];
 
+    #[cfg(target_os="linux")]{
+        let mut signals=Signals::new(&[SIGTERM]).unwrap();
+        std::thread::spawn(move||{
+            for _ in &mut signals{
+                println!("SIGTERM received");
+                unsafe{running=false}
+                TcpStream::connect(address).unwrap();
+            }
+        });
+    }
+
     println!("Set up");
 
     println!("Listenining...");
-    loop{
+    while unsafe{running}{
         match server_socket.accept(){
             Ok((mut client_socket,_address))=>{
                 println!("Got connection");
@@ -145,5 +169,5 @@ fn main(){
         }
     }
 
-    // println!("Shutdown");
+    println!("Shutdown");
 }
