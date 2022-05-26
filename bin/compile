@@ -1,0 +1,65 @@
+#!/bin/bash
+
+APP_DIR=${1:-}
+
+CACHE_DIR=${2:-}
+ENV_DIR=${3:-}
+
+BUILDPACK_DIR=$(pwd)
+
+# echo "-----> Downloading Tcl"
+# curl -L https://prdownloads.sourceforge.net/tcl/tcl8.6.12-src.tar.gz | tar xz
+# cd tcl8.6.12-src/unix
+# ./configure
+# make
+# make install
+
+# cd $BUILDPACK_DIR
+
+# echo "-----> Downloading sqlite"
+# curl -L https://www.sqlite.org/src/tarball/sqlite.tar.gz?r=release | tar xz
+# mkdir bld
+# cd bld
+# ../sqlite/configure
+# make
+# make sqlite3.c
+
+# cd $BUILDPACK_DIR
+
+# echo "-----> Downloading PHP"
+# curl -L https://www.php.net/distributions/php-8.1.4.tar.gz | tar xz
+# cd php-8.1.4
+# ./configure --with-sqlite3=bld
+# make
+# make install
+
+cd $BUILDPACK_DIR
+
+echo "-----> Downloading rustup"
+curl https://sh.rustup.rs -sSf > rustup.sh
+chmod u+x rustup.sh
+echo "-----> Using rustup to install Rust channel stable"
+./rustup.sh -y --default-toolchain stable
+rm rustup.sh
+
+source $HOME/.cargo/env
+
+cargo build --release
+
+echo "-----> Setting up"
+
+cd $APP_DIR
+
+rm -rf composer.json vendor
+
+cd $BUILDPACK_DIR
+
+cp Procfile $APP_DIR
+cp -r php_config $APP_DIR
+
+cp target/release/cat_web $APP_DIR
+
+# cd $APP_DIR
+# FULL_APP_PATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+# echo -e "\n auto_prepend_file = \"$FULL_APP_PATH/php_config/auto_prepend_file.php\"" >> $FULL_APP_PATH/php_config/php.ini
