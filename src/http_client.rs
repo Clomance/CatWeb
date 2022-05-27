@@ -39,6 +39,8 @@ impl HTTPClient{
             };
 
             if let Some(request_url)=split_header.next(){
+                let request_url:String=urlencoding::decode(request_url).unwrap().into_owned();
+
                 let mut splited_url=request_url.split("?");
 
                 let mut path=unsafe{SOURCE_DIRECTORY.to_string()};
@@ -103,6 +105,7 @@ impl HTTPClient{
 
             content_type=if let Some(extension)=file_extension.next(){
                 match extension.to_lowercase().as_str(){
+                    "html"=>"text/html; charset=utf-8",
                     "png"=>"image/png",
                     "jpeg"|"jpg"=>"image/jpeg",
                     "xml"|"svg"=>"image/svg+xml",
