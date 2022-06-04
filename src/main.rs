@@ -1,4 +1,4 @@
-#![allow(non_snake_case,non_upper_case_globals,dead_code,invalid_value)]
+#![allow(non_snake_case,non_upper_case_globals)]
 mod http_client;
 use http_client::{
     HTTPClient,
@@ -35,8 +35,10 @@ use std::{
     path::Path,
 };
 
+pub const SERVER_NAME:&'static str="CrocoServer";
+
 // Время ожидания получения/отправки данных
-const default_client_rw_timeout:Duration=Duration::from_micros(2500);
+const default_client_rw_timeout:Duration=Duration::from_millis(2500);
 
 const DEFAULT_SOURCE_DIRECTORY:&'static str=".";
 // Папка с файлами веб приложения
@@ -155,8 +157,10 @@ fn main(){
                         client_socket.set_write_timeout(Some(default_client_rw_timeout)).is_ok()
                 {
                     if let Ok(bytes)=client_socket.read(&mut buffer){
-                        if let Ok(client)=HTTPClient::new(client_socket,&buffer[0..bytes]){
-                            thread_pool.handle_client(client);
+                        if let Ok(mut client)=HTTPClient::new(client_socket,&buffer[0..bytes]){
+                            if !client.is_recursive_redirect(){
+                                thread_pool.handle_client(client);
+                            }
                         }
                     }
                 }

@@ -12,9 +12,6 @@ use std::{
         Arc,
         Mutex,
     },
-    time::{
-        Duration,
-    },
 };
 
 pub struct DynamicThreading{
@@ -39,17 +36,19 @@ impl DynamicThreading{
         let pool_reference=self.pool.clone();
         let thread_id=self.counter;
 
-        let client_thread=Builder::new().stack_size(self.thread_stack_memory).spawn(move||{
-            client.handle(thread_id).unwrap();
-            // Ожидание получения клиентом всех данных
-            client.flush().unwrap();
+        let thread_name=format!("CT{}",thread_id);
+        let client_thread=Builder::new()
+                .name(thread_name)
+                .stack_size(self.thread_stack_memory)
+                .spawn(move||{
+                    client.handle(thread_id).unwrap();
+                    // Ожидание получения клиентом всех данных
+                    client.flush().unwrap();
 
-            // Слишком быстрые ответы не воспринимаются Heroku
-            std::thread::sleep(Duration::from_millis(2));
-
-            pool_reference.lock().unwrap().remove(&thread_id);
-            println!("Thread {} Removed from the thread pool",thread_id);
-        }).unwrap();
+                    pool_reference.lock().unwrap().remove(&thread_id);
+                    println!("Thread {} Removed from the thread pool",thread_id);
+                })
+                .unwrap();
 
         self.pool.lock().unwrap().insert(self.counter,client_thread);
         self.counter+=1;
