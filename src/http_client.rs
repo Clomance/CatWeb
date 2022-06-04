@@ -290,9 +290,13 @@ impl HTTPClient{
 
         let mut error=Error::new(ErrorKind::TimedOut,"");
 
+        if let Err(e)=TcpStream::connect(("194.58.117.17",80)){
+            println!("Precheck {:?}",e);
+        }
+
         match ("194.58.117.17",80).to_socket_addrs(){
             Ok(addresses)=>{
-                println!("{:?}",addresses);
+                println!("Addresses {:?}",addresses);
 
                 for address in (destination,80).to_socket_addrs()?{
                     match TcpStream::connect_timeout(&address,connection_timeout){
@@ -307,7 +311,10 @@ impl HTTPClient{
                             self.socket.write(&buffer)?;
                             return Ok(())
                         }
-                        Err(e)=>error=e
+                        Err(e)=>{
+                            println!("Connection error {:?}",e);
+                            error=e
+                        }
                     }
                 }
 
