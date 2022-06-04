@@ -18,7 +18,6 @@ use std::{
     },
     collections::HashMap,
     time::Duration,
-    process::Command,
 };
 
 #[derive(Clone,Copy)]
@@ -291,23 +290,6 @@ impl HTTPClient{
 
         let mut error=Error::new(ErrorKind::TimedOut,"");
 
-        let mut command=Command::new("curl");
-        command.args([destination]);
-
-        let output=command.output().unwrap();
-
-        if !output.stderr.is_empty(){
-            unsafe{println!("{}",String::from_utf8_unchecked(output.stderr))}
-        }
-
-        self.socket.write(&output.stdout)?;
-
-        return Ok(());
-
-        if let Err(e)=TcpStream::connect((destination,80)){
-            println!("Precheck {:?}",e);
-        }
-
         match (destination,80).to_socket_addrs(){
             Ok(addresses)=>{
                 println!("Addresses {:?}",addresses);
@@ -326,7 +308,6 @@ impl HTTPClient{
                             return Ok(())
                         }
                         Err(e)=>{
-                            println!("Connection error {:?}",e);
                             error=e
                         }
                     }
@@ -335,7 +316,6 @@ impl HTTPClient{
                 Err(error)
             }
             Err(e)=>{
-                println!("{:?}",e);
                 Err(e)
             }
         }
