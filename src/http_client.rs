@@ -290,8 +290,18 @@ impl HTTPClient{
 
         let mut error=Error::new(ErrorKind::TimedOut,"");
 
-        let responce=attohttpc::get(destination).send().unwrap();
-        println!("{:?}",responce);
+        // let responce=attohttpc::get(destination).send().unwrap();
+        // println!("{:?}",responce);
+
+        match (destination,80).to_socket_addrs(){
+            Ok(addresses)=>{
+                println!("{:?}",addresses);
+            }
+            Err(e)=>{
+                println!("{:?}",e);
+                return Err(e)
+            }
+        }
 
         for address in (destination,80).to_socket_addrs()?{
             match TcpStream::connect_timeout(&address,connection_timeout){
