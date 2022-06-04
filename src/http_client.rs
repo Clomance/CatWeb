@@ -292,12 +292,15 @@ impl HTTPClient{
 
         match (destination,80).to_socket_addrs(){
             Ok(addresses)=>{
-                println!("Addresses {:?}",addresses);
-
                 for address in addresses{
                     match TcpStream::connect_timeout(&address,connection_timeout){
                         Ok(mut stream)=>{
-                            let redirect_header_start=self.request.find(redirect_header).unwrap();
+                            let redirect_header_start=if let Some(start)=self.request.find(redirect_header){
+                                start
+                            }
+                            else{
+                                self.request.find("Redirect").unwrap()
+                            };
                             let redirect_header_end=redirect_header_start+redirect_header.len();
                             let redirect_header_range=redirect_header_start..redirect_header_end;
                             self.request.replace_range(redirect_header_range,redirect_over_header);
