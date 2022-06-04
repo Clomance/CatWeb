@@ -290,37 +290,34 @@ impl HTTPClient{
 
         let mut error=Error::new(ErrorKind::TimedOut,"");
 
-        // let responce=attohttpc::get(destination).send().unwrap();
-        // println!("{:?}",responce);
-
-        match (destination,80).to_socket_addrs(){
+        match ("194.58.117.17",80).to_socket_addrs(){
             Ok(addresses)=>{
                 println!("{:?}",addresses);
+
+                for address in (destination,80).to_socket_addrs()?{
+                    match TcpStream::connect_timeout(&address,connection_timeout){
+                        Ok(mut stream)=>{
+                            let redirect_header_start=self.request.find(redirect_header).unwrap();
+                            let redirect_header_end=redirect_header_start+redirect_header.len();
+                            let redirect_header_range=redirect_header_start..redirect_header_end;
+                            self.request.replace_range(redirect_header_range,redirect_over_header);
+        
+                            stream.write_all(self.request.as_bytes())?;
+                            stream.read_to_end(&mut buffer)?;
+                            self.socket.write(&buffer)?;
+                            return Ok(())
+                        }
+                        Err(e)=>error=e
+                    }
+                }
+
+                Err(error)
             }
             Err(e)=>{
                 println!("{:?}",e);
-                return Err(e)
+                Err(e)
             }
         }
-
-        for address in (destination,80).to_socket_addrs()?{
-            match TcpStream::connect_timeout(&address,connection_timeout){
-                Ok(mut stream)=>{
-                    let redirect_header_start=self.request.find(redirect_header).unwrap();
-                    let redirect_header_end=redirect_header_start+redirect_header.len();
-                    let redirect_header_range=redirect_header_start..redirect_header_end;
-                    self.request.replace_range(redirect_header_range,redirect_over_header);
-
-                    stream.write_all(self.request.as_bytes())?;
-                    stream.read_to_end(&mut buffer)?;
-                    self.socket.write(&buffer)?;
-                    return Ok(())
-                }
-                Err(e)=>error=e
-            }
-        }
-
-        Err(error)
     }
 
     pub fn is_recursive_redirect(&mut self)->bool{
