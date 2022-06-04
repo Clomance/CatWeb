@@ -109,7 +109,7 @@ impl HTTPClient{
                             break
                         }
                         let (name,value)=header.split_once(":").unwrap();
-                        headers.insert(name.to_lowercase(),value.to_string());
+                        headers.insert(name.trim().to_lowercase(),value.trim().to_string());
                     }
 
                     return Ok(
