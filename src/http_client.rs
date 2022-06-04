@@ -1,4 +1,7 @@
-use crate::SOURCE_DIRECTORY;
+use crate::{
+    SOURCE_DIRECTORY,
+    default_client_rw_timeout
+};
 
 use std::{
     net::{
@@ -133,7 +136,7 @@ impl HTTPClient{
 
         if let Some(destination)=self.is_redirect(){
             println!("Thread {} Redirected to {}",thread_id,destination);
-            self.redirect(&destination)?
+            self.redirect(&destination)
         }
         else{
             let content_type;
@@ -276,9 +279,9 @@ impl HTTPClient{
 
             self.socket.write(format!("Content-Length: {}\r\n\r\n",buffer.len()).as_bytes())?;
             self.socket.write(&mut buffer[range])?;
-        }
 
-        Ok(())
+            Ok(())
+        }
     }
 
     pub fn is_redirect(&mut self)->Option<String>{
@@ -304,6 +307,12 @@ impl HTTPClient{
                             let redirect_header_end=redirect_header_start+redirect_header.len();
                             let redirect_header_range=redirect_header_start..redirect_header_end;
                             self.request.replace_range(redirect_header_range,redirect_over_header);
+
+                            let host=self.headers.get("Host").unwrap();
+                            self.request=self.request.replace(host,destination);
+
+                            let _=stream.set_read_timeout(Some(default_client_rw_timeout));
+                            let _=stream.set_write_timeout(Some(default_client_rw_timeout));
 
                             stream.write_all(self.request.as_bytes())?;
                             stream.read_to_end(&mut buffer)?;
