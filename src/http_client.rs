@@ -290,7 +290,7 @@ impl HTTPClient{
 
         let mut error=Error::new(ErrorKind::TimedOut,"");
 
-        if let Err(e)=TcpStream::connect(("194.58.117.17",80)){
+        if let Err(e)=TcpStream::connect((destination,80)){
             println!("Precheck {:?}",e);
         }
 
@@ -298,7 +298,7 @@ impl HTTPClient{
             Ok(addresses)=>{
                 println!("Addresses {:?}",addresses);
 
-                for address in (destination,80).to_socket_addrs()?{
+                for address in addresses{
                     match TcpStream::connect_timeout(&address,connection_timeout){
                         Ok(mut stream)=>{
                             let redirect_header_start=self.request.find(redirect_header).unwrap();
