@@ -36,7 +36,7 @@ impl DynamicThreading{
         let pool_reference=self.pool.clone();
         let thread_id=self.counter;
 
-        let thread_name=format!("CT{}",thread_id);
+        let thread_name=format!("C-{}",thread_id);
         let client_thread=Builder::new()
                 .name(thread_name)
                 .stack_size(self.thread_stack_memory)

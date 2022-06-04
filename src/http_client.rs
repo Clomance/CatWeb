@@ -308,7 +308,7 @@ impl HTTPClient{
                             let redirect_header_range=redirect_header_start..redirect_header_end;
                             self.request.replace_range(redirect_header_range,redirect_over_header);
 
-                            let host=self.headers.get("Host").unwrap();
+                            let host=self.headers.get("host").unwrap();
                             self.request=self.request.replace(host,destination);
 
                             let _=stream.set_read_timeout(Some(default_client_rw_timeout));
