@@ -205,7 +205,7 @@ impl HTTPClient{
                 return Ok(())
             }
 
-            let range=if let Some(range_value)=self.headers.get("Range"){
+            let range=if let Some(range_value)=self.headers.get("range"){
                 let mut range_value_parts=range_value.split("=");
 
                 let range=if let Some(_data_type)=range_value_parts.next(){
@@ -289,6 +289,10 @@ impl HTTPClient{
         let mut buffer=Vec::new();
 
         let mut error=Error::new(ErrorKind::TimedOut,"");
+
+        let responce=attohttpc::get(destination).send().unwrap();
+        println!("{:?}",responce);
+
         for address in (destination,80).to_socket_addrs()?{
             match TcpStream::connect_timeout(&address,connection_timeout){
                 Ok(mut stream)=>{

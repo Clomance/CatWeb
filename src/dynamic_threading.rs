@@ -41,9 +41,13 @@ impl DynamicThreading{
                 .name(thread_name)
                 .stack_size(self.thread_stack_memory)
                 .spawn(move||{
-                    client.handle(thread_id).unwrap();
+                    match client.handle(thread_id){
+                        Ok(())=>{
+                            let _=client.flush();
+                        }
+                        Err(e)=>println!("Thread {} Got error: {:?}",thread_id,e)
+                    }
                     // Ожидание получения клиентом всех данных
-                    client.flush().unwrap();
 
                     pool_reference.lock().unwrap().remove(&thread_id);
                     println!("Thread {} Removed from the thread pool",thread_id);
