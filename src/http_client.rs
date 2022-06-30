@@ -1,6 +1,7 @@
 use crate::{
     SOURCE_DIRECTORY,
-    default_client_rw_timeout
+    default_client_rw_timeout,
+    log,
 };
 
 use std::{
@@ -63,15 +64,14 @@ pub struct HTTPClient{
     method:HTTPMethod,
     path:String,
     args:HashMap<String,String>,
-    headers:HashMap<String,String>
+    headers:HashMap<String,String>,
+    buffer:Vec<u8>,
 }
 
 impl HTTPClient{
     pub fn new(socket:TcpStream,request:&[u8])->Result<HTTPClient,()>{
         let request=unsafe{std::str::from_utf8_unchecked(request).to_string()};
         let mut request_parts=request.split("\r\n");
-
-        println!("{}",request);
 
         if let Some(start_line)=request_parts.next(){
             let mut start_line_parts=start_line.split(" ");
@@ -82,7 +82,7 @@ impl HTTPClient{
 
                     "POST"=>HTTPMethod::Post,
 
-                    _=>HTTPMethod::Get
+                    _=>return Err(())
                 };
 
                 if let Some(request_url)=start_line_parts.next(){
@@ -121,7 +121,8 @@ impl HTTPClient{
                             method,
                             path,
                             args,
-                            headers
+                            headers,
+                            buffer:Vec::new()
                         }
                     )
                 }
@@ -131,11 +132,9 @@ impl HTTPClient{
         Err(())
     }
 
-    pub fn handle(&mut self,thread_id:usize)->std::io::Result<()>{
-        let mut buffer=Vec::new();
-
+    pub fn handle(&mut self)->std::io::Result<()>{
         if let Some(destination)=self.is_redirect(){
-            println!("Thread {} Redirected to {}",thread_id,destination);
+            log!("Redirected to {}",destination);
             self.redirect(&destination)
         }
         else{
@@ -151,7 +150,7 @@ impl HTTPClient{
 
                 path_buffer.push("index.html");
 
-                println!("Thread {} IndexRequested, Directory {:?}",thread_id,self.path);
+                log!("IndexRequested, Directory {:?}",self.path);
 
                 // Если файл `index.html` не существует, то пробуем `index.php`
                 if !path_buffer.exists(){
@@ -162,7 +161,7 @@ impl HTTPClient{
                 }
             }
             else{
-                println!("Thread {} FileRequested {:?}",thread_id,path);
+                log!("FileRequested {:?}",path);
                 let mut file_extension=self.path.rsplit(".");
 
                 content_type=if let Some(extension)=file_extension.next(){
@@ -187,23 +186,21 @@ impl HTTPClient{
             }
 
             if path_buffer.exists(){
-                println!("Thread {} FileExists",thread_id);
+                log!("FileExists");
 
                 if execute{
-                    println!("Thread {} FileExecutable",thread_id);
-
-                    buffer=crate::php_executor::execute(
+                    self.buffer=crate::php_executor::execute(
                         path_buffer.to_str().unwrap(),
                         self.method,
                         &self.args
                     );
                 }
                 else if let Ok(mut file)=OpenOptions::new().read(true).open(&path_buffer){
-                    file.read_to_end(&mut buffer)?;
+                    file.read_to_end(&mut self.buffer)?;
                 }
             }
             else{
-                println!("Thread {} FileNotFound",thread_id);
+                log!("FileNotFound");
                 self.socket.write(b"HTTP/1.1 404 Not Found\r\nServer: CrocoServer\r\n\r\n")?;
                 return Ok(())
             }
@@ -226,14 +223,14 @@ impl HTTPClient{
                                     }
                                     else{
                                         let from_end:usize=range_end.parse().unwrap();
-                                        let start=buffer.len()-from_end;
-                                        start..buffer.len()
+                                        let start=self.buffer.len()-from_end;
+                                        start..self.buffer.len()
                                     }
                                 }
                                 else{
                                     let start:usize=range_start.parse().unwrap();
                                     if range_end.is_empty(){
-                                        start..buffer.len()
+                                        start..self.buffer.len()
                                     }
                                     else{
                                         let start:usize=range_start.parse().unwrap();
@@ -260,7 +257,7 @@ impl HTTPClient{
 
                 self.socket.write(b"HTTP/1.1 206 Partial Content\r\nServer: CrocoServer\r\n")?;
 
-                let range_header=format!("Content-Range: bytes {}-{}/{}\r\n",range.start,range.end-1,buffer.len());
+                let range_header=format!("Content-Range: bytes {}-{}/{}\r\n",range.start,range.end-1,self.buffer.len());
                 self.socket.write(range_header.as_bytes())?;
 
                 range
@@ -268,7 +265,7 @@ impl HTTPClient{
             else{
                 self.socket.write(b"HTTP/1.1 200 OK\r\nServer: CrocoServer\r\n")?;
 
-                0..buffer.len()
+                0..self.buffer.len()
             };
 
             let content_type_header=format!("Content-Type: {}\r\n",content_type);
@@ -277,8 +274,8 @@ impl HTTPClient{
             self.socket.write(content_type_header.as_bytes())?;
             self.socket.write(b"Cache-Control: public\r\n")?;
 
-            self.socket.write(format!("Content-Length: {}\r\n\r\n",buffer.len()).as_bytes())?;
-            self.socket.write(&mut buffer[range])?;
+            self.socket.write(format!("Content-Length: {}\r\n\r\n",self.buffer.len()).as_bytes())?;
+            self.socket.write(&mut self.buffer[range])?;
 
             Ok(())
         }
@@ -289,11 +286,20 @@ impl HTTPClient{
     }
 
     pub fn redirect(&mut self,destination:&str)->std::io::Result<()>{
-        let mut buffer=Vec::new();
-
         let mut error=Error::new(ErrorKind::TimedOut,"");
 
-        match (destination,80).to_socket_addrs(){
+        if destination.is_empty(){
+            return Ok(())
+        }
+
+        if !destination.starts_with("http"){
+            return Ok(())
+        }
+
+        let (_,url_part)=destination.split_once("//").unwrap();
+        let (domain,path)=url_part.split_once("/").unwrap();
+
+        match (domain,80).to_socket_addrs(){
             Ok(addresses)=>{
                 for address in addresses{
                     match TcpStream::connect_timeout(&address,connection_timeout){
@@ -309,28 +315,31 @@ impl HTTPClient{
                             self.request.replace_range(redirect_header_range,redirect_over_header);
 
                             let host=self.headers.get("host").unwrap();
-                            self.request=self.request.replace(host,destination);
+                            self.request=self.request.replace(host,domain);
+
+                            let start=self.request.find(" ").unwrap()+2;
+                            let end=self.request[start..].find(" ").unwrap()+start;
+                            self.request.replace_range(start..end,path);
+
+                            log!("{}",self.request);
 
                             let _=stream.set_read_timeout(Some(default_client_rw_timeout));
                             let _=stream.set_write_timeout(Some(default_client_rw_timeout));
 
-                            stream.write_all(self.request.as_bytes())?;
-                            stream.read_to_end(&mut buffer)?;
-                            self.socket.write(&buffer)?;
+                            stream.write(self.request.as_bytes())?;
+                            stream.flush()?;
+
+                            stream.read_to_end(&mut self.buffer)?;
+                            self.socket.write(&self.buffer)?;
                             return Ok(())
                         }
-                        Err(e)=>{
-                            error=e
-                        }
+                        Err(e)=>error=e
                     }
                 }
-
-                Err(error)
             }
-            Err(e)=>{
-                Err(e)
-            }
+            Err(e)=>error=e
         }
+        Err(error)
     }
 
     pub fn is_recursive_redirect(&mut self)->bool{

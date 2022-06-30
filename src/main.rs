@@ -40,11 +40,11 @@ pub const SERVER_NAME:&'static str="CrocoServer";
 // Время ожидания получения/отправки данных
 const default_client_rw_timeout:Duration=Duration::from_millis(2500);
 
-const DEFAULT_SOURCE_DIRECTORY:&'static str=".";
+const DEFAULT_SOURCE_DIRECTORY:&'static str="C:/Users/Clone/Desktop/Web/crocodev";
 // Папка с файлами веб приложения
 pub static mut SOURCE_DIRECTORY:String=String::new();
 
-const DEFAULT_PHP_PATH:&'static str="php";
+const DEFAULT_PHP_PATH:&'static str="C:/Users/Clone/Desktop/Web/php/php.exe";
 pub static mut PHP_PATH:String=String::new();
 
 pub static mut running:bool=true;
@@ -163,9 +163,9 @@ fn main(){
                             }
                         }
                     }
-                }
+                }   
 
-                println!("Handled");
+                println!("Processed");
             },
             Err(_)=>{
 

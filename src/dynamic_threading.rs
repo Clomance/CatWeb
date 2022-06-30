@@ -1,5 +1,6 @@
 use super::{
     HTTPClient,
+    log,
 };
 
 use std::{
@@ -41,20 +42,29 @@ impl DynamicThreading{
                 .name(thread_name)
                 .stack_size(self.thread_stack_memory)
                 .spawn(move||{
-                    match client.handle(thread_id){
+                    log!("Got client");
+                    match client.handle(){
                         Ok(())=>{
                             let _=client.flush();
                         }
-                        Err(e)=>println!("Thread {} Got error: {:?}",thread_id,e)
+                        Err(e)=>log!("Finished with an error: {:?}",e)
                     }
-                    // Ожидание получения клиентом всех данных
 
                     pool_reference.lock().unwrap().remove(&thread_id);
-                    println!("Thread {} Removed from the thread pool",thread_id);
                 })
                 .unwrap();
 
         self.pool.lock().unwrap().insert(self.counter,client_thread);
         self.counter+=1;
     }
+}
+
+#[macro_export]
+macro_rules! log {
+    ($($arg:tt)*) => {
+        if let Some(name)=std::thread::current().name(){
+            print!("{} ",name);
+            println!($($arg)*);
+        }
+    };
 }
